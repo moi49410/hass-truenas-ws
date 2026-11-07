@@ -1,0 +1,129 @@
+service_start:
+  fields:
+    name:
+      required: true
+      example: "cifs"
+      selector:
+        text:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: truenas_ws
+
+service_stop:
+  fields:
+    name:
+      required: true
+      example: "cifs"
+      selector:
+        text:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: truenas_ws
+
+service_restart:
+  fields:
+    name:
+      required: true
+      example: "cifs"
+      selector:
+        text:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: truenas_ws
+
+app_start:
+  fields:
+    name:
+      required: true
+      example: "my-app"
+      selector:
+        text:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: truenas_ws
+
+app_stop:
+  fields:
+    name:
+      required: true
+      example: "my-app"
+      selector:
+        text:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: truenas_ws
+
+app_restart:
+  fields:
+    name:
+      required: true
+      example: "my-app"
+      selector:
+        text:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: truenas_ws
+
+cloudsync_run:
+  fields:
+    name:
+      required: true
+      example: "Backup to cloud"
+      selector:
+        text:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: truenas_ws
+
+replication_run:
+  fields:
+    name:
+      required: true
+      example: "Replicate tank"
+      selector:
+        text:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: truenas_ws
+
+dataset_snapshot_create:
+  fields:
+    name:
+      required: true
+      example: "tank/documents"
+      selector:
+        text:
+    snapshot_name:
+      example: "before-upgrade"
+      selector:
+        text:
+    recursive:
+      default: false
+      selector:
+        boolean:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: truenas_ws
+
+system_reboot:
+  fields:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: truenas_ws
+
+system_shutdown:
+  fields:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: truenas_ws

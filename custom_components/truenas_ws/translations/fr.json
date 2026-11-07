@@ -1,0 +1,204 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connexion à TrueNAS SCALE",
+        "description": "TrueNAS SCALE 25.04 ou plus récent requis. Crée une clé API dans TrueNAS (menu utilisateur en haut à droite → API Keys). La connexion se fait toujours en HTTPS : TrueNAS révoque une clé utilisée en HTTP simple.",
+        "data": {
+          "host": "Hôte",
+          "api_key": "Clé API",
+          "verify_ssl": "Vérifier le certificat SSL"
+        },
+        "data_description": {
+          "host": "Adresse IP ou nom d'hôte, éventuellement suivi de :port.",
+          "verify_ssl": "Laisser désactivé avec le certificat auto-signé par défaut."
+        }
+      },
+      "reauth_confirm": {
+        "title": "Nouvelle clé API",
+        "description": "La clé API de {host} a été refusée. Saisis-en une nouvelle.",
+        "data": {
+          "api_key": "Clé API"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Impossible de joindre TrueNAS en HTTPS/WebSocket.",
+      "invalid_auth": "Clé API refusée.",
+      "unknown": "Erreur inattendue, voir les journaux."
+    },
+    "abort": {
+      "already_configured": "Ce TrueNAS est déjà configuré.",
+      "reauth_successful": "Clé API mise à jour."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options",
+        "data": {
+          "scan_interval": "Intervalle de lecture"
+        },
+        "data_description": {
+          "scan_interval": "Secondes entre deux lectures. Les statistiques en direct (CPU, réseau, mémoire) sont envoyées par TrueNAS."
+        }
+      }
+    }
+  },
+  "services": {
+    "service_start": {
+      "name": "Démarrer un service TrueNAS",
+      "description": "Démarre un service système (SMB, NFS, SSH...).",
+      "fields": {
+        "name": {
+          "name": "Service",
+          "description": "Nom du service dans TrueNAS, par ex. cifs, nfs, ssh."
+        },
+        "config_entry_id": {
+          "name": "Système TrueNAS",
+          "description": "Utile seulement si plusieurs TrueNAS sont configurés."
+        }
+      }
+    },
+    "service_stop": {
+      "name": "Arrêter un service TrueNAS",
+      "description": "Arrête un service système.",
+      "fields": {
+        "name": {
+          "name": "Service",
+          "description": "Nom du service, par ex. cifs."
+        },
+        "config_entry_id": {
+          "name": "Système TrueNAS",
+          "description": "Utile seulement si plusieurs TrueNAS sont configurés."
+        }
+      }
+    },
+    "service_restart": {
+      "name": "Redémarrer un service TrueNAS",
+      "description": "Redémarre un service système.",
+      "fields": {
+        "name": {
+          "name": "Service",
+          "description": "Nom du service, par ex. cifs."
+        },
+        "config_entry_id": {
+          "name": "Système TrueNAS",
+          "description": "Utile seulement si plusieurs TrueNAS sont configurés."
+        }
+      }
+    },
+    "app_start": {
+      "name": "Démarrer une app",
+      "description": "Démarre une app TrueNAS.",
+      "fields": {
+        "name": {
+          "name": "App",
+          "description": "Nom de l'app."
+        },
+        "config_entry_id": {
+          "name": "Système TrueNAS",
+          "description": "Utile seulement si plusieurs TrueNAS sont configurés."
+        }
+      }
+    },
+    "app_stop": {
+      "name": "Arrêter une app",
+      "description": "Arrête une app TrueNAS.",
+      "fields": {
+        "name": {
+          "name": "App",
+          "description": "Nom de l'app."
+        },
+        "config_entry_id": {
+          "name": "Système TrueNAS",
+          "description": "Utile seulement si plusieurs TrueNAS sont configurés."
+        }
+      }
+    },
+    "app_restart": {
+      "name": "Redémarrer une app",
+      "description": "Redéploie (redémarre) une app TrueNAS.",
+      "fields": {
+        "name": {
+          "name": "App",
+          "description": "Nom de l'app."
+        },
+        "config_entry_id": {
+          "name": "Système TrueNAS",
+          "description": "Utile seulement si plusieurs TrueNAS sont configurés."
+        }
+      }
+    },
+    "cloudsync_run": {
+      "name": "Lancer une synchro cloud",
+      "description": "Lance tout de suite une tâche de synchronisation cloud.",
+      "fields": {
+        "name": {
+          "name": "Tâche",
+          "description": "Description de la tâche (ou son id)."
+        },
+        "config_entry_id": {
+          "name": "Système TrueNAS",
+          "description": "Utile seulement si plusieurs TrueNAS sont configurés."
+        }
+      }
+    },
+    "replication_run": {
+      "name": "Lancer une réplication",
+      "description": "Lance tout de suite une tâche de réplication.",
+      "fields": {
+        "name": {
+          "name": "Tâche",
+          "description": "Nom de la tâche (ou son id)."
+        },
+        "config_entry_id": {
+          "name": "Système TrueNAS",
+          "description": "Utile seulement si plusieurs TrueNAS sont configurés."
+        }
+      }
+    },
+    "dataset_snapshot_create": {
+      "name": "Créer un snapshot de dataset",
+      "description": "Prend un snapshot ZFS d'un dataset.",
+      "fields": {
+        "name": {
+          "name": "Dataset",
+          "description": "Nom complet du dataset, par ex. pool/dataset."
+        },
+        "snapshot_name": {
+          "name": "Nom du snapshot",
+          "description": "Par défaut : homeassistant-<date>."
+        },
+        "recursive": {
+          "name": "Récursif",
+          "description": "Inclure aussi les datasets enfants."
+        },
+        "config_entry_id": {
+          "name": "Système TrueNAS",
+          "description": "Utile seulement si plusieurs TrueNAS sont configurés."
+        }
+      }
+    },
+    "system_reboot": {
+      "name": "Redémarrer TrueNAS",
+      "description": "Redémarre le NAS.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Système TrueNAS",
+          "description": "Utile seulement si plusieurs TrueNAS sont configurés."
+        }
+      }
+    },
+    "system_shutdown": {
+      "name": "Éteindre TrueNAS",
+      "description": "Éteint le NAS. Il faudra le rallumer à la main.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Système TrueNAS",
+          "description": "Utile seulement si plusieurs TrueNAS sont configurés."
+        }
+      }
+    }
+  }
+}

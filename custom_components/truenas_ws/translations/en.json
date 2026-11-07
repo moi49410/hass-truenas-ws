@@ -1,0 +1,204 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to TrueNAS SCALE",
+        "description": "Requires TrueNAS SCALE 25.04 or newer. Create an API key in TrueNAS (top-right user menu → API Keys). The connection always uses HTTPS: TrueNAS revokes a key used over plain HTTP.",
+        "data": {
+          "host": "Host",
+          "api_key": "API key",
+          "verify_ssl": "Verify the SSL certificate"
+        },
+        "data_description": {
+          "host": "IP address or hostname, optionally with :port.",
+          "verify_ssl": "Leave off with the default self-signed certificate."
+        }
+      },
+      "reauth_confirm": {
+        "title": "New API key",
+        "description": "The API key for {host} was refused. Enter a new one.",
+        "data": {
+          "api_key": "API key"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to TrueNAS over HTTPS/WebSocket.",
+      "invalid_auth": "API key refused.",
+      "unknown": "Unexpected error, see the logs."
+    },
+    "abort": {
+      "already_configured": "This TrueNAS system is already configured.",
+      "reauth_successful": "API key updated."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options",
+        "data": {
+          "scan_interval": "Polling interval"
+        },
+        "data_description": {
+          "scan_interval": "Seconds between two reads. Live statistics (CPU, network, memory) are pushed by TrueNAS."
+        }
+      }
+    }
+  },
+  "services": {
+    "service_start": {
+      "name": "Start a TrueNAS service",
+      "description": "Starts a system service (SMB, NFS, SSH...).",
+      "fields": {
+        "name": {
+          "name": "Service",
+          "description": "Service name as shown by TrueNAS, e.g. cifs, nfs, ssh."
+        },
+        "config_entry_id": {
+          "name": "TrueNAS system",
+          "description": "Only needed when several TrueNAS systems are configured."
+        }
+      }
+    },
+    "service_stop": {
+      "name": "Stop a TrueNAS service",
+      "description": "Stops a system service.",
+      "fields": {
+        "name": {
+          "name": "Service",
+          "description": "Service name, e.g. cifs."
+        },
+        "config_entry_id": {
+          "name": "TrueNAS system",
+          "description": "Only needed when several TrueNAS systems are configured."
+        }
+      }
+    },
+    "service_restart": {
+      "name": "Restart a TrueNAS service",
+      "description": "Restarts a system service.",
+      "fields": {
+        "name": {
+          "name": "Service",
+          "description": "Service name, e.g. cifs."
+        },
+        "config_entry_id": {
+          "name": "TrueNAS system",
+          "description": "Only needed when several TrueNAS systems are configured."
+        }
+      }
+    },
+    "app_start": {
+      "name": "Start an app",
+      "description": "Starts a TrueNAS app.",
+      "fields": {
+        "name": {
+          "name": "App",
+          "description": "App name."
+        },
+        "config_entry_id": {
+          "name": "TrueNAS system",
+          "description": "Only needed when several TrueNAS systems are configured."
+        }
+      }
+    },
+    "app_stop": {
+      "name": "Stop an app",
+      "description": "Stops a TrueNAS app.",
+      "fields": {
+        "name": {
+          "name": "App",
+          "description": "App name."
+        },
+        "config_entry_id": {
+          "name": "TrueNAS system",
+          "description": "Only needed when several TrueNAS systems are configured."
+        }
+      }
+    },
+    "app_restart": {
+      "name": "Restart an app",
+      "description": "Redeploys (restarts) a TrueNAS app.",
+      "fields": {
+        "name": {
+          "name": "App",
+          "description": "App name."
+        },
+        "config_entry_id": {
+          "name": "TrueNAS system",
+          "description": "Only needed when several TrueNAS systems are configured."
+        }
+      }
+    },
+    "cloudsync_run": {
+      "name": "Run a cloud sync task",
+      "description": "Runs a cloud sync task now.",
+      "fields": {
+        "name": {
+          "name": "Task",
+          "description": "Task description (or id)."
+        },
+        "config_entry_id": {
+          "name": "TrueNAS system",
+          "description": "Only needed when several TrueNAS systems are configured."
+        }
+      }
+    },
+    "replication_run": {
+      "name": "Run a replication task",
+      "description": "Runs a replication task now.",
+      "fields": {
+        "name": {
+          "name": "Task",
+          "description": "Task name (or id)."
+        },
+        "config_entry_id": {
+          "name": "TrueNAS system",
+          "description": "Only needed when several TrueNAS systems are configured."
+        }
+      }
+    },
+    "dataset_snapshot_create": {
+      "name": "Create a dataset snapshot",
+      "description": "Takes a ZFS snapshot of a dataset.",
+      "fields": {
+        "name": {
+          "name": "Dataset",
+          "description": "Full dataset name, e.g. pool/dataset."
+        },
+        "snapshot_name": {
+          "name": "Snapshot name",
+          "description": "Default: homeassistant-<date>."
+        },
+        "recursive": {
+          "name": "Recursive",
+          "description": "Also snapshot child datasets."
+        },
+        "config_entry_id": {
+          "name": "TrueNAS system",
+          "description": "Only needed when several TrueNAS systems are configured."
+        }
+      }
+    },
+    "system_reboot": {
+      "name": "Reboot TrueNAS",
+      "description": "Reboots the NAS.",
+      "fields": {
+        "config_entry_id": {
+          "name": "TrueNAS system",
+          "description": "Only needed when several TrueNAS systems are configured."
+        }
+      }
+    },
+    "system_shutdown": {
+      "name": "Shut down TrueNAS",
+      "description": "Shuts the NAS down. It will have to be powered on by hand.",
+      "fields": {
+        "config_entry_id": {
+          "name": "TrueNAS system",
+          "description": "Only needed when several TrueNAS systems are configured."
+        }
+      }
+    }
+  }
+}
