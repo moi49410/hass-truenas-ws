@@ -20,7 +20,7 @@ Elle reprend le schéma de noms d'entités de l'ancienne intégration communauta
 | Datasets | espace utilisé (GiB) + propriétés ZFS | `sensor.truenas_datasets_tank_media` |
 | Disques | température (°C) + modèle, série, taille… | `sensor.truenas_disks_sda` |
 | Services | en marche / arrêté | `binary_sensor.truenas_services_cifs` |
-| Apps | en marche / arrêtée + mise à jour installable | `binary_sensor.truenas_apps_my_app`, `update.truenas_apps_my_app` |
+| Apps | en marche / arrêtée, interrupteur pour démarrer / arrêter, mise à jour installable | `binary_sensor.truenas_apps_my_app`, `switch.truenas_apps_my_app`, `update.truenas_apps_my_app` |
 | Réplications | état de la dernière exécution (`SUCCESS`, `FAILED`, `RUNNING`…) | `sensor.truenas_replication_my_task` |
 | Synchro cloud | état de la dernière exécution | `sensor.truenas_cloudsync_my_task` |
 | Snapshots périodiques | état de la tâche | `sensor.truenas_snapshot_tasks_tank` |
