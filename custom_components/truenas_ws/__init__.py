@@ -63,6 +63,7 @@ from .coordinator import TrueNASConfigEntry, TrueNASCoordinator
 
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
+    Platform.BUTTON,
     Platform.SENSOR,
     Platform.SWITCH,
     Platform.UPDATE,

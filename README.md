@@ -25,6 +25,7 @@ Elle reprend le schéma de noms d'entités de l'ancienne intégration communauta
 | Synchro cloud | état de la dernière exécution | `sensor.truenas_cloudsync_my_task` |
 | Snapshots périodiques | état de la tâche | `sensor.truenas_snapshot_tasks_tank` |
 | Système | mise à jour de TrueNAS installable (le NAS redémarre) | `update.truenas_system` |
+| Système | boutons redémarrer / éteindre le NAS | `button.truenas_system_reboot`, `button.truenas_system_shutdown` |
 
 Les statistiques en direct (CPU, mémoire, ARC, réseau) arrivent par l'événement
 `reporting.realtime`. Le reste est lu toutes les 30 s (réglable), les températures de
@@ -39,7 +40,9 @@ installée, nouvelle tâche…
 `truenas_ws.service_start` / `service_stop` / `service_restart`,
 `truenas_ws.app_start` / `app_stop` / `app_restart`,
 `truenas_ws.cloudsync_run`, `truenas_ws.replication_run`,
-`truenas_ws.dataset_snapshot_create`, `truenas_ws.system_reboot`, `truenas_ws.system_shutdown`.
+`truenas_ws.dataset_snapshot_create`, `truenas_ws.system_reboot`, `truenas_ws.system_shutdown`,
+`truenas_ws.pool_import` / `pool_export` (disque de sauvegarde externe par exemple).
+`truenas_ws.replication_run` accepte `wait: true` pour attendre la fin et renvoyer le résultat.
 
 ```yaml
 action: truenas_ws.replication_run
