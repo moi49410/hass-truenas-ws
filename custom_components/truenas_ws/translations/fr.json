@@ -152,6 +152,10 @@
           "name": "Tâche",
           "description": "Nom de la tâche (ou son id)."
         },
+        "wait": {
+          "name": "Attendre la fin",
+          "description": "Attendre la fin de la réplication et renvoyer son résultat (succès, erreur)."
+        },
         "config_entry_id": {
           "name": "Système TrueNAS",
           "description": "Utile seulement si plusieurs TrueNAS sont configurés."
@@ -194,6 +198,34 @@
       "name": "Éteindre TrueNAS",
       "description": "Éteint le NAS. Il faudra le rallumer à la main.",
       "fields": {
+        "config_entry_id": {
+          "name": "Système TrueNAS",
+          "description": "Utile seulement si plusieurs TrueNAS sont configurés."
+        }
+      }
+    },
+    "pool_import": {
+      "name": "Importer un pool",
+      "description": "Importe un pool exporté, par exemple un disque de sauvegarde externe qu'on vient de brancher. Indique s'il est chiffré et encore verrouillé.",
+      "fields": {
+        "name": {
+          "name": "Pool",
+          "description": "Nom du pool."
+        },
+        "config_entry_id": {
+          "name": "Système TrueNAS",
+          "description": "Utile seulement si plusieurs TrueNAS sont configurés."
+        }
+      }
+    },
+    "pool_export": {
+      "name": "Exporter un pool",
+      "description": "Exporte (déconnecte) un pool pour pouvoir débrancher ses disques. Les données ne sont jamais supprimées.",
+      "fields": {
+        "name": {
+          "name": "Pool",
+          "description": "Nom du pool."
+        },
         "config_entry_id": {
           "name": "Système TrueNAS",
           "description": "Utile seulement si plusieurs TrueNAS sont configurés."

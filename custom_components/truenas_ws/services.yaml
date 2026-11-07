@@ -89,6 +89,10 @@ replication_run:
       example: "Replicate tank"
       selector:
         text:
+    wait:
+      default: false
+      selector:
+        boolean:
     config_entry_id:
       selector:
         config_entry:
@@ -123,6 +127,30 @@ system_reboot:
 
 system_shutdown:
   fields:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: truenas_ws
+
+pool_import:
+  fields:
+    name:
+      required: true
+      example: "backup"
+      selector:
+        text:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: truenas_ws
+
+pool_export:
+  fields:
+    name:
+      required: true
+      example: "backup"
+      selector:
+        text:
     config_entry_id:
       selector:
         config_entry:

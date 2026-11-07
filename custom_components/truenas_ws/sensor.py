@@ -333,6 +333,8 @@ def _build(coordinator: TrueNASCoordinator) -> dict[str, Callable[[], Entity]]:
             "Readonly": prop(ds.get("readonly")),
             "Recordsize": prop(ds.get("recordsize")),
             "Encryption algorithm": prop(ds.get("encryption_algorithm")),
+            "Encrypted": ds.get("encrypted"),
+            "Locked": ds.get("locked"),
             "Used": _gib(ds.get("used")),
             "Available": _gib(ds.get("available")),
         }

@@ -152,6 +152,10 @@
           "name": "Task",
           "description": "Task name (or id)."
         },
+        "wait": {
+          "name": "Wait for the end",
+          "description": "Wait until the replication ends and return its result (success, error)."
+        },
         "config_entry_id": {
           "name": "TrueNAS system",
           "description": "Only needed when several TrueNAS systems are configured."
@@ -194,6 +198,34 @@
       "name": "Shut down TrueNAS",
       "description": "Shuts the NAS down. It will have to be powered on by hand.",
       "fields": {
+        "config_entry_id": {
+          "name": "TrueNAS system",
+          "description": "Only needed when several TrueNAS systems are configured."
+        }
+      }
+    },
+    "pool_import": {
+      "name": "Import a pool",
+      "description": "Imports an exported pool, for example an external backup disk that was just plugged in. Returns whether it is encrypted and still locked.",
+      "fields": {
+        "name": {
+          "name": "Pool",
+          "description": "Pool name."
+        },
+        "config_entry_id": {
+          "name": "TrueNAS system",
+          "description": "Only needed when several TrueNAS systems are configured."
+        }
+      }
+    },
+    "pool_export": {
+      "name": "Export a pool",
+      "description": "Exports (disconnects) a pool so its disks can be unplugged. Data is never destroyed.",
+      "fields": {
+        "name": {
+          "name": "Pool",
+          "description": "Pool name."
+        },
         "config_entry_id": {
           "name": "TrueNAS system",
           "description": "Only needed when several TrueNAS systems are configured."

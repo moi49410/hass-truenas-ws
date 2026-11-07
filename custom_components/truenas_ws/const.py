@@ -57,8 +57,18 @@ SERVICE_REPLICATION_RUN: Final = "replication_run"
 SERVICE_SNAPSHOT_CREATE: Final = "dataset_snapshot_create"
 SERVICE_SYSTEM_REBOOT: Final = "system_reboot"
 SERVICE_SYSTEM_SHUTDOWN: Final = "system_shutdown"
+SERVICE_POOL_IMPORT: Final = "pool_import"
+SERVICE_POOL_EXPORT: Final = "pool_export"
+
+# Pools that must never be exported from Home Assistant.
+PROTECTED_POOLS: Final = {"boot-pool", "freenas-boot"}
+
+# Upper bounds for jobs we wait on.
+REPLICATION_TIMEOUT: Final = 6 * 3600  # seconds
+POOL_JOB_TIMEOUT: Final = 15 * 60  # seconds
 
 ATTR_NAME: Final = "name"
 ATTR_CONFIG_ENTRY_ID: Final = "config_entry_id"
 ATTR_SNAPSHOT_NAME: Final = "snapshot_name"
 ATTR_RECURSIVE: Final = "recursive"
+ATTR_WAIT: Final = "wait"
