@@ -1,3 +1,5 @@
+<img src="docs/icon.svg" width="96" align="right" alt="">
+
 # TrueNAS SCALE (WebSocket) pour Home Assistant
 
 Intégration Home Assistant pour **TrueNAS SCALE 25.04 et plus récent** (testée pour 25.10),
@@ -89,6 +91,10 @@ Différences à connaître :
 - Une entité de disque est liée au disque (identifiant TrueNAS), pas à sa lettre `sdX`.
 - Ne sont pas gérés (pour l'instant) : machines virtuelles, conteneurs, jails (CORE).
 - L'entité de mise à jour HACS de l'intégration elle-même change de nom avec le dépôt.
+
+## Icône
+
+L'icône et le logo (dossier `custom_components/truenas_ws/brand/`) sont une création originale du projet, sans lien avec les marques d'iXsystems. Home Assistant 2026.3 et plus récent les affiche automatiquement.
 
 ## Dépannage
 
