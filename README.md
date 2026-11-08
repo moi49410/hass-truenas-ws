@@ -29,6 +29,7 @@ Elle reprend le schéma de noms d'entités de l'ancienne intégration communauta
 | Système | mise à jour de TrueNAS installable (le NAS redémarre) | `update.truenas_system` |
 | Système | boutons redémarrer / éteindre le NAS | `button.truenas_system_reboot`, `button.truenas_system_shutdown` |
 | Système | allumer le NAS (Wake-on-LAN, fonctionne NAS éteint) | `button.truenas_system_power_on`, action `truenas_ws.wake` |
+| Système | vérifie qu'un script de démarrage active le Wake-on-LAN (`ethtool -s <interface> wol g` en Post Init) | `binary_sensor.truenas_system_wake_on_lan_at_boot` |
 | Alertes | alertes TrueNAS actives en direct (nombre + texte), problème si niveau ≥ WARNING, événement `truenas_ws_alert` à chaque nouvelle alerte | `sensor.truenas_system_alerts`, `binary_sensor.truenas_system_alert` |
 | Pools | organisation (data, special, log, cache…) dans l'attribut `Topology`, état du scrub et bouton pour en lancer un | `sensor.truenas_system_tank_scrub`, `button.truenas_system_tank_start_scrub` |
 | Disques | santé : rôle dans le pool, erreurs ZFS lecture/écriture/checksum, alertes TrueNAS qui citent le disque (SMART, température) | `binary_sensor.truenas_disks_sda_health` |

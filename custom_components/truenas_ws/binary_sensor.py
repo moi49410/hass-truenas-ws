@@ -268,6 +268,16 @@ def _build(coordinator: TrueNASCoordinator) -> dict[str, Callable[[], Entity]]:
             and str(a.get("level") or "").upper() in ALERT_PROBLEM_LEVELS
         ]
 
+    out["sys_wol_boot"] = lambda: TrueNASBinarySensor(
+        coordinator,
+        DEV_SYSTEM,
+        "Wake-on-LAN at boot",
+        "system_wol_boot",
+        lambda d: bool(d.wol_scripts) if d.wol_scripts is not None else None,
+        lambda d: d.wol_scripts is not None,
+        lambda d: {"Scripts": d.wol_scripts or None},
+    )
+
     out["sys_alert"] = lambda: TrueNASBinarySensor(
         coordinator,
         DEV_SYSTEM,

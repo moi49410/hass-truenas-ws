@@ -71,6 +71,8 @@ class TrueNASData:
     topology: dict[str, dict[str, list[str]]] = field(default_factory=dict)
     # disk name -> {"raw": last raw reading, "ignored": count of ignored readings}
     temp_filter: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # Enabled boot-time scripts that turn Wake-on-LAN on (no command text kept)
+    wol_scripts: list[dict[str, Any]] | None = None
 
 
 def parse_date(value: Any) -> datetime | None:
@@ -320,6 +322,21 @@ class TrueNASCoordinator(DataUpdateCoordinator[TrueNASData]):
             if share.get("id") is not None:
                 data.smb_shares[str(share["id"])] = share
 
+        # Wake-on-LAN at boot (init scripts running "ethtool ... wol g") -- #
+        scripts = await self._optional("initshutdownscript.query")
+        if scripts is not None:
+            data.wol_scripts = [
+                {
+                    "id": sc.get("id"),
+                    "when": sc.get("when"),
+                    "comment": sc.get("comment") or None,
+                }
+                for sc in scripts
+                if sc.get("enabled")
+                and sc.get("when") in ("PREINIT", "POSTINIT")
+                and _is_wol_command(str(sc.get("command") or sc.get("script") or ""))
+            ]
+
         # Alerts ------------------------------------------------------- #
         alerts = await self._optional("alert.list")
         data.alerts = [a for a in alerts or [] if isinstance(a, dict)]
@@ -534,3 +551,11 @@ def parse_topology(
                     "checksum_errors": int(stats.get("checksum_errors") or 0),
                 }
     return roles, health
+
+
+_WOL_RE = re.compile(r"ethtool\s+(?:-s|--change)\s+\S+.*\bwol\s+\S*g", re.IGNORECASE)
+
+
+def _is_wol_command(command: str) -> bool:
+    """True for commands like 'ethtool -s eth0 wol g'."""
+    return bool(_WOL_RE.search(command))
