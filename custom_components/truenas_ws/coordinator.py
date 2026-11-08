@@ -207,7 +207,11 @@ class TrueNASCoordinator(DataUpdateCoordinator[TrueNASData]):
             data.datasets[name] = ds
 
         # Disks -------------------------------------------------------- #
-        for disk in await self._optional("disk.query") or []:
+        # "extra.pools" fills the "pool" field (empty by default since 24.10).
+        disks = await self._optional("disk.query", [[], {"extra": {"pools": True}}])
+        if disks is None:
+            disks = await self._optional("disk.query")
+        for disk in disks or []:
             key = disk.get("identifier") or disk.get("serial") or disk.get("name")
             if key and disk.get("name"):
                 data.disks[key] = disk
