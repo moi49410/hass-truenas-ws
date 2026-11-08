@@ -27,8 +27,10 @@ from homeassistant.helpers.selector import (
 
 from .api import TrueNASAuthError, TrueNASClient, TrueNASConnectionError, TrueNASError
 from .const import (
+    CONF_FILTER_TEMPS,
     CONF_SCAN_INTERVAL,
     CONF_VERIFY_SSL,
+    DEFAULT_FILTER_TEMPS,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_VERIFY_SSL,
     DOMAIN,
@@ -179,6 +181,12 @@ class TrueNASOptionsFlow(OptionsFlowWithReload):
                         mode=NumberSelectorMode.BOX,
                     )
                 ),
+                vol.Required(
+                    CONF_FILTER_TEMPS,
+                    default=self.config_entry.options.get(
+                        CONF_FILTER_TEMPS, DEFAULT_FILTER_TEMPS
+                    ),
+                ): bool,
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)

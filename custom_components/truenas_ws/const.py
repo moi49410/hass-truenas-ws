@@ -10,10 +10,26 @@ MANUFACTURER: Final = "iXsystems"
 
 CONF_VERIFY_SSL: Final = "verify_ssl"
 CONF_SCAN_INTERVAL: Final = "scan_interval"
+CONF_FILTER_TEMPS: Final = "filter_spurious_temps"
+CONF_MAC: Final = "mac"
 
 DEFAULT_VERIFY_SSL: Final = False
 DEFAULT_SCAN_INTERVAL: Final = 30  # seconds
 MIN_SCAN_INTERVAL: Final = 10
+DEFAULT_FILTER_TEMPS: Final = True
+APP_STATS_INTERVAL: Final = 10  # seconds between app.stats events
+
+# Some NVMe SSDs (Samsung 980 family) intermittently report exactly 84 °C
+# (357 K) because of a firmware issue; such readings can be ignored.
+SPURIOUS_TEMP_MODELS: Final = ("SSD 980",)
+SPURIOUS_TEMP_RANGE: Final = (83.5, 84.5)
+
+# Pool topology roles, in display order.
+TOPOLOGY_ROLES: Final = ("data", "special", "dedup", "log", "cache", "spare")
+ALERT_PROBLEM_LEVELS: Final = {"WARNING", "ERROR", "CRITICAL", "ALERT", "EMERGENCY"}
+EVENT_ALERT: Final = "truenas_ws_alert"
+CONFIG_BACKUP_DIR: Final = "truenas_backups"
+CONFIG_BACKUP_KEEP: Final = 10
 
 # Slow data, refreshed less often than the main poll.
 DISK_TEMP_INTERVAL: Final = timedelta(minutes=5)  # TrueNAS caches temps 5 min
@@ -33,6 +49,7 @@ DEV_APPS: Final = "Apps"
 DEV_CLOUDSYNC: Final = "Cloudsync"
 DEV_REPLICATION: Final = "Replication"
 DEV_SNAPSHOT_TASKS: Final = "Snapshot tasks"
+DEV_SHARES: Final = "Shares"
 
 GIB: Final = 1024**3
 
@@ -59,6 +76,11 @@ SERVICE_SYSTEM_REBOOT: Final = "system_reboot"
 SERVICE_SYSTEM_SHUTDOWN: Final = "system_shutdown"
 SERVICE_POOL_IMPORT: Final = "pool_import"
 SERVICE_POOL_EXPORT: Final = "pool_export"
+SERVICE_POOL_SCRUB: Final = "pool_scrub"
+SERVICE_SMART_TEST: Final = "smart_test"
+SERVICE_CONFIG_BACKUP: Final = "config_backup"
+SERVICE_ALERT_DISMISS: Final = "alert_dismiss"
+SERVICE_WAKE: Final = "wake"
 
 # Pools that must never be exported from Home Assistant.
 PROTECTED_POOLS: Final = {"boot-pool", "freenas-boot"}
@@ -72,3 +94,7 @@ ATTR_CONFIG_ENTRY_ID: Final = "config_entry_id"
 ATTR_SNAPSHOT_NAME: Final = "snapshot_name"
 ATTR_RECURSIVE: Final = "recursive"
 ATTR_WAIT: Final = "wait"
+ATTR_TYPE: Final = "type"
+ATTR_DISKS: Final = "disks"
+ATTR_INCLUDE_SECRETS: Final = "include_secrets"
+ATTR_ID: Final = "id"

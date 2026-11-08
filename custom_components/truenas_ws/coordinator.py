@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 import logging
+import re
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -21,13 +22,21 @@ from .api import (
     TrueNASMethodNotFound,
 )
 from .const import (
+    APP_STATS_INTERVAL,
     APP_UPGRADE_SUMMARY_INTERVAL,
+    CONF_FILTER_TEMPS,
+    CONF_MAC,
     CONF_SCAN_INTERVAL,
+    DEFAULT_FILTER_TEMPS,
     DEFAULT_SCAN_INTERVAL,
     DISK_TEMP_INTERVAL,
     DOMAIN,
     HIDDEN_DATASET_PARTS,
+    EVENT_ALERT,
     PHYSICAL_IFACE_TYPES,
+    SPURIOUS_TEMP_MODELS,
+    SPURIOUS_TEMP_RANGE,
+    TOPOLOGY_ROLES,
     UPDATE_CHECK_INTERVAL,
 )
 
@@ -53,6 +62,15 @@ class TrueNASData:
     cloudsyncs: dict[str, dict[str, Any]] = field(default_factory=dict)
     snapshot_tasks: dict[str, dict[str, Any]] = field(default_factory=dict)
     update: dict[str, Any] = field(default_factory=dict)
+    alerts: list[dict[str, Any]] = field(default_factory=list)
+    app_stats: dict[str, dict[str, Any]] = field(default_factory=dict)
+    smb_shares: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # disk name -> role, vdev, pool, ZFS status and error counters
+    disk_health: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # pool name -> {role: ["RAIDZ1 (sdb, sdc, sdd)", ...]}
+    topology: dict[str, dict[str, list[str]]] = field(default_factory=dict)
+    # disk name -> {"raw": last raw reading, "ignored": count of ignored readings}
+    temp_filter: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 def parse_date(value: Any) -> datetime | None:
@@ -121,6 +139,10 @@ class TrueNASCoordinator(DataUpdateCoordinator[TrueNASData]):
         self._update: dict[str, Any] = {}
         self._upgrade_summaries: dict[str, dict[str, Any]] = {}
         self._warned: set[str] = set()
+        self._app_stats: dict[str, dict[str, Any]] = {}
+        self._good_temps: dict[str, float] = {}
+        self._temp_filter: dict[str, dict[str, Any]] = {}
+        self._seen_alerts: set[str] | None = None
 
     # ------------------------------------------------------------------ #
     async def async_shutdown(self) -> None:
@@ -131,6 +153,18 @@ class TrueNASCoordinator(DataUpdateCoordinator[TrueNASData]):
     def _on_realtime(self, _collection: str, fields: dict[str, Any]) -> None:
         if fields:
             self._realtime = fields
+
+    def _on_app_stats(self, _collection: str, fields: Any) -> None:
+        if isinstance(fields, list):
+            self._app_stats = {
+                item["app_name"]: item
+                for item in fields
+                if isinstance(item, dict) and item.get("app_name")
+            }
+
+    def _on_alert(self, _collection: str, _fields: Any) -> None:
+        """New or cleared TrueNAS alert: refresh at once instead of waiting."""
+        self.hass.async_create_task(self.async_request_refresh())
 
     async def _optional(self, method: str, params: list[Any] | None = None) -> Any:
         """Call a method whose absence or failure must not break the update."""
@@ -165,11 +199,16 @@ class TrueNASCoordinator(DataUpdateCoordinator[TrueNASData]):
             # connect() also restores the event subscriptions.
             await client.connect()
         if not self._subscribed:
-            try:
-                await client.subscribe("reporting.realtime", self._on_realtime)
-                self._subscribed = True
-            except TrueNASError as err:
-                _LOGGER.warning("Live statistics unavailable: %s", err)
+            for name, callback in (
+                ("reporting.realtime", self._on_realtime),
+                (f'app.stats:{{"interval": {APP_STATS_INTERVAL}}}', self._on_app_stats),
+                ("alert.list", self._on_alert),
+            ):
+                try:
+                    await client.subscribe(name, callback)
+                except TrueNASError as err:
+                    _LOGGER.warning("Cannot subscribe to %s: %s", name, err)
+            self._subscribed = True
 
         data = TrueNASData()
         now = dt_util.utcnow()
@@ -225,14 +264,23 @@ class TrueNASCoordinator(DataUpdateCoordinator[TrueNASData]):
                 if names
                 else {}
             )
-            self._disk_temps = _parse_temps(temps or {})
+            self._disk_temps = self._filter_temps(_parse_temps(temps or {}), data)
             self._last_disk_temps = now
         data.disk_temps = self._disk_temps
+        data.temp_filter = self._temp_filter
+
+        # Pool topology and per-disk ZFS health --------------------------- #
+        for pool_name, pool in data.pools.items():
+            roles, health = parse_topology(pool)
+            data.topology[pool_name] = roles
+            for disk_name, info in health.items():
+                data.disk_health[disk_name] = {"pool": pool_name, **info}
 
         # Interfaces --------------------------------------------------- #
         for iface in await self._optional("interface.query") or []:
             if iface.get("type") in PHYSICAL_IFACE_TYPES and iface.get("name"):
                 data.interfaces[iface["name"]] = iface
+        self._remember_mac(data)
 
         # Services ----------------------------------------------------- #
         for svc in await self._optional("service.query") or []:
@@ -255,6 +303,17 @@ class TrueNASCoordinator(DataUpdateCoordinator[TrueNASData]):
         for name, summary in self._upgrade_summaries.items():
             if name in data.apps:
                 data.apps[name]["_upgrade_summary"] = summary
+        data.app_stats = dict(self._app_stats)
+
+        # SMB shares --------------------------------------------------- #
+        for share in await self._optional("sharing.smb.query") or []:
+            if share.get("id") is not None:
+                data.smb_shares[str(share["id"])] = share
+
+        # Alerts ------------------------------------------------------- #
+        alerts = await self._optional("alert.list")
+        data.alerts = [a for a in alerts or [] if isinstance(a, dict)]
+        self._fire_new_alerts(data.alerts)
 
         # Data protection tasks --------------------------------------- #
         for rep in await self._optional("replication.query") or []:
@@ -302,6 +361,67 @@ class TrueNASCoordinator(DataUpdateCoordinator[TrueNASData]):
             }
         return {}
 
+    def _filter_temps(
+        self, temps: dict[str, float | None], data: TrueNASData
+    ) -> dict[str, float | None]:
+        """Ignore known firmware glitches (exactly 84 °C on some NVMe SSDs)."""
+        enabled = self.config_entry.options.get(CONF_FILTER_TEMPS, DEFAULT_FILTER_TEMPS)
+        models = {d["name"]: str(d.get("model") or "") for d in data.disks.values()}
+        out: dict[str, float | None] = {}
+        low, high = SPURIOUS_TEMP_RANGE
+        for name, value in temps.items():
+            info = self._temp_filter.setdefault(name, {"raw": None, "ignored": 0})
+            info["raw"] = value
+            glitch = (
+                enabled
+                and value is not None
+                and low <= value <= high
+                and any(m in models.get(name, "") for m in SPURIOUS_TEMP_MODELS)
+            )
+            if glitch:
+                info["ignored"] += 1
+                out[name] = self._good_temps.get(name)
+                continue
+            if value is not None:
+                self._good_temps[name] = value
+            out[name] = value
+        return out
+
+    def _remember_mac(self, data: TrueNASData) -> None:
+        """Store the NAS MAC address so Wake-on-LAN works while it is off."""
+        mac = None
+        for iface in data.interfaces.values():
+            state = iface.get("state") or {}
+            addr = state.get("link_address") or iface.get("link_address")
+            if addr and state.get("link_state") == "LINK_STATE_UP":
+                mac = addr
+                break
+        entry = self.config_entry
+        if mac and entry.data.get(CONF_MAC) != mac:
+            self.hass.config_entries.async_update_entry(
+                entry, data={**entry.data, CONF_MAC: mac}
+            )
+
+    def _fire_new_alerts(self, alerts: list[dict[str, Any]]) -> None:
+        """Fire truenas_ws_alert for alerts that appeared since the last poll."""
+        active = {
+            a.get("uuid") or a.get("id"): a for a in alerts if not a.get("dismissed")
+        }
+        if self._seen_alerts is not None:
+            for uid, alert in active.items():
+                if uid and uid not in self._seen_alerts:
+                    self.hass.bus.async_fire(
+                        EVENT_ALERT,
+                        {
+                            "uuid": uid,
+                            "level": alert.get("level"),
+                            "klass": alert.get("klass"),
+                            "text": alert_text(alert),
+                            "datetime": str(parse_date(alert.get("datetime")) or ""),
+                        },
+                    )
+        self._seen_alerts = {uid for uid in active if uid}
+
     def refresh_update_soon(self) -> None:
         """Force the next poll to re-read the system update status."""
         self._last_update_check = None
@@ -335,3 +455,66 @@ def _parse_temps(raw: Any) -> dict[str, float | None]:
         )
         out[name] = float(value) if isinstance(value, int | float) else None
     return out
+
+
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def alert_text(alert: dict[str, Any]) -> str:
+    """Plain text of a TrueNAS alert."""
+    text = alert.get("formatted") or alert.get("text") or alert.get("klass") or ""
+    return _TAG_RE.sub("", str(text)).strip()
+
+
+def disk_base_name(name: str | None) -> str | None:
+    """'sdb1' -> 'sdb', 'nvme0n1p2' -> 'nvme0n1', '/dev/sdc' -> 'sdc'."""
+    if not name:
+        return None
+    name = name.rsplit("/", 1)[-1]
+    if name.startswith("nvme"):
+        return re.sub(r"p\d+$", "", name)
+    return re.sub(r"(?<=[a-z])\d+$", "", name)
+
+
+def _vdev_leaves(vdev: dict[str, Any]) -> list[dict[str, Any]]:
+    children = vdev.get("children") or []
+    if not children:
+        return [vdev]
+    leaves: list[dict[str, Any]] = []
+    for child in children:
+        leaves.extend(_vdev_leaves(child))
+    return leaves
+
+
+def parse_topology(
+    pool: dict[str, Any],
+) -> tuple[dict[str, list[str]], dict[str, dict[str, Any]]]:
+    """Return ({role: [vdev descriptions]}, {disk: health}) for one pool."""
+    topology = pool.get("topology") or {}
+    roles: dict[str, list[str]] = {}
+    health: dict[str, dict[str, Any]] = {}
+    for role in TOPOLOGY_ROLES:
+        for vdev in topology.get(role) or []:
+            leaves = _vdev_leaves(vdev)
+            names = [
+                disk_base_name(
+                    leaf.get("disk") or leaf.get("device") or leaf.get("path")
+                )
+                for leaf in leaves
+            ]
+            vtype = str(vdev.get("type") or "DISK")
+            desc = f"{vtype} ({', '.join(n for n in names if n)})"
+            roles.setdefault(role, []).append(desc)
+            for leaf, name in zip(leaves, names, strict=True):
+                if not name:
+                    continue
+                stats = leaf.get("stats") or {}
+                health[name] = {
+                    "role": role,
+                    "vdev": desc,
+                    "status": leaf.get("status"),
+                    "read_errors": int(stats.get("read_errors") or 0),
+                    "write_errors": int(stats.get("write_errors") or 0),
+                    "checksum_errors": int(stats.get("checksum_errors") or 0),
+                }
+    return roles, health

@@ -37,10 +37,12 @@
       "init": {
         "title": "Options",
         "data": {
-          "scan_interval": "Polling interval"
+          "scan_interval": "Polling interval",
+          "filter_spurious_temps": "Ignore spurious 84 °C readings"
         },
         "data_description": {
-          "scan_interval": "Seconds between two reads. Live statistics (CPU, network, memory) are pushed by TrueNAS."
+          "scan_interval": "Seconds between two reads. Live statistics (CPU, network, memory) are pushed by TrueNAS.",
+          "filter_spurious_temps": "Some NVMe SSDs (Samsung 980 family) intermittently report exactly 84 °C because of a firmware issue. When on, those readings are replaced by the last good value; the raw value stays in the attributes."
         }
       }
     }
@@ -226,6 +228,76 @@
           "name": "Pool",
           "description": "Pool name."
         },
+        "config_entry_id": {
+          "name": "TrueNAS system",
+          "description": "Only needed when several TrueNAS systems are configured."
+        }
+      }
+    },
+    "pool_scrub": {
+      "name": "Scrub a pool",
+      "description": "Starts a scrub (integrity check) of a pool now.",
+      "fields": {
+        "name": {
+          "name": "Pool",
+          "description": "Pool name."
+        },
+        "config_entry_id": {
+          "name": "TrueNAS system",
+          "description": "Only needed when several TrueNAS systems are configured."
+        }
+      }
+    },
+    "smart_test": {
+      "name": "Start a SMART test",
+      "description": "Starts a SMART self-test. Failures are reported as TrueNAS alerts.",
+      "fields": {
+        "type": {
+          "name": "Type",
+          "description": "SHORT (a few minutes) or LONG (full surface scan, slows the disks)."
+        },
+        "disks": {
+          "name": "Disks",
+          "description": "Disk names (sda, nvme0n1...). Empty = all disks."
+        },
+        "config_entry_id": {
+          "name": "TrueNAS system",
+          "description": "Only needed when several TrueNAS systems are configured."
+        }
+      }
+    },
+    "config_backup": {
+      "name": "Back up the TrueNAS configuration",
+      "description": "Downloads the configuration into the truenas_backups folder of Home Assistant (10 latest kept).",
+      "fields": {
+        "include_secrets": {
+          "name": "Include secrets",
+          "description": "Also saves the secret seed and encryption keys. Keep such a file private: anyone holding it can unlock encrypted pools."
+        },
+        "config_entry_id": {
+          "name": "TrueNAS system",
+          "description": "Only needed when several TrueNAS systems are configured."
+        }
+      }
+    },
+    "alert_dismiss": {
+      "name": "Dismiss an alert",
+      "description": "Dismisses a TrueNAS alert.",
+      "fields": {
+        "id": {
+          "name": "Alert id",
+          "description": "The uuid shown in the Alerts sensor attributes."
+        },
+        "config_entry_id": {
+          "name": "TrueNAS system",
+          "description": "Only needed when several TrueNAS systems are configured."
+        }
+      }
+    },
+    "wake": {
+      "name": "Wake the NAS (Wake-on-LAN)",
+      "description": "Sends a magic packet to switch the NAS on. Wake-on-LAN must be enabled in its BIOS/UEFI.",
+      "fields": {
         "config_entry_id": {
           "name": "TrueNAS system",
           "description": "Only needed when several TrueNAS systems are configured."

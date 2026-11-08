@@ -28,6 +28,15 @@ Elle reprend le schéma de noms d'entités de l'ancienne intégration communauta
 | Snapshots périodiques | état de la tâche | `sensor.truenas_snapshot_tasks_tank` |
 | Système | mise à jour de TrueNAS installable (le NAS redémarre) | `update.truenas_system` |
 | Système | boutons redémarrer / éteindre le NAS | `button.truenas_system_reboot`, `button.truenas_system_shutdown` |
+| Système | allumer le NAS (Wake-on-LAN, fonctionne NAS éteint) | `button.truenas_system_power_on`, action `truenas_ws.wake` |
+| Alertes | alertes TrueNAS actives en direct (nombre + texte), problème si niveau ≥ WARNING, événement `truenas_ws_alert` à chaque nouvelle alerte | `sensor.truenas_system_alerts`, `binary_sensor.truenas_system_alert` |
+| Pools | organisation (data, special, log, cache…) dans l'attribut `Topology`, état du scrub et bouton pour en lancer un | `sensor.truenas_system_tank_scrub`, `button.truenas_system_tank_start_scrub` |
+| Disques | santé : rôle dans le pool, erreurs ZFS lecture/écriture/checksum, alertes TrueNAS qui citent le disque (SMART, température) | `binary_sensor.truenas_disks_sda_health` |
+| Disques | lancer un test SMART court ou long | `button.truenas_system_smart_short_test` |
+| Tâches | progression en % des réplications et synchros cloud en cours | `sensor.truenas_replication_my_task_progress` |
+| Apps | CPU et mémoire de chaque app | `sensor.truenas_apps_my_app_cpu`, `sensor.truenas_apps_my_app_memory` |
+| Partages | activer / couper chaque partage SMB | `switch.truenas_shares_public` |
+| Configuration | sauvegarde de la configuration TrueNAS dans `<config>/truenas_backups` (10 gardées) | `button.truenas_system_config_backup`, action `truenas_ws.config_backup` |
 
 Les statistiques en direct (CPU, mémoire, ARC, réseau) arrivent par l'événement
 `reporting.realtime`. Le reste est lu toutes les 30 s (réglable), les températures de
@@ -90,6 +99,9 @@ Différences à connaître :
   TrueNAS) et non plus des graphiques de reporting.
 - Une entité de disque est liée au disque (identifiant TrueNAS), pas à sa lettre `sdX`.
 - Ne sont pas gérés (pour l'instant) : machines virtuelles, conteneurs, jails (CORE).
+- Depuis TrueNAS 25.10, l'API ne donne plus les résultats des tests SMART : TrueNAS surveille SMART lui-même (toutes les 90 min) et lève une alerte en cas de problème, que l'intégration rattache au disque concerné.
+- Option « Ignorer les fausses lectures à 84 °C » (activée par défaut) : certains SSD Samsung 980 renvoient par moments exactement 84 °C (défaut de firmware). La valeur brute reste visible dans l'attribut `Raw temperature`.
+- La sauvegarde de configuration **avec secrets** contient les clés de chiffrement des pools : garde-la privée (attention aux sauvegardes Home Assistant envoyées dans le cloud).
 - L'entité de mise à jour HACS de l'intégration elle-même change de nom avec le dépôt.
 
 ## Icône

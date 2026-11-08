@@ -1,4 +1,4 @@
-"""Switches to start and stop TrueNAS apps."""
+"""Switches: start/stop TrueNAS apps, enable/disable SMB shares."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .api import TrueNASError
-from .const import DEV_APPS
+from .const import DEV_APPS, DEV_SHARES
 from .coordinator import TrueNASConfigEntry, TrueNASCoordinator
 from .entity import TrueNASEntity, add_dynamic_entities, app_icon
 
@@ -95,11 +95,74 @@ class TrueNASAppSwitch(TrueNASEntity, SwitchEntity):
         await self._control("app.stop", False)
 
 
+class TrueNASShareSwitch(TrueNASEntity, SwitchEntity):
+    """Enable (on) or disable (off) one SMB share."""
+
+    _attr_icon = "mdi:folder-network"
+
+    def __init__(self, coordinator: TrueNASCoordinator, share_id: str) -> None:
+        """Create switch.truenas_shares_<name>."""
+        share = coordinator.data.smb_shares[share_id]
+        super().__init__(
+            coordinator,
+            "switch",
+            DEV_SHARES,
+            share.get("name") or f"share {share_id}",
+            f"smb_share_{share_id}",
+        )
+        self._share_id = share_id
+
+    @property
+    def available(self) -> bool:
+        """Unavailable when the share is deleted."""
+        return super().available and self._share_id in self.data.smb_shares
+
+    @property
+    def is_on(self) -> bool | None:
+        """On when the share is enabled."""
+        share = self.data.smb_shares.get(self._share_id)
+        return bool(share.get("enabled")) if share else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Path and options of the share."""
+        share = self.data.smb_shares.get(self._share_id) or {}
+        return {
+            "Path": share.get("path"),
+            "Comment": share.get("comment") or None,
+            "Read only": share.get("readonly"),
+            "Browsable": share.get("browsable"),
+            "Locked": share.get("locked"),
+        }
+
+    async def _set(self, enabled: bool) -> None:
+        try:
+            await self.coordinator.client.call(
+                "sharing.smb.update", [int(self._share_id), {"enabled": enabled}]
+            )
+        except TrueNASError as err:
+            raise HomeAssistantError(f"Cannot update the SMB share: {err}") from err
+        self.data.smb_shares[self._share_id]["enabled"] = enabled
+        self.async_write_ha_state()
+        await self.coordinator.async_request_refresh()
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Enable the share."""
+        await self._set(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Disable the share."""
+        await self._set(False)
+
+
 def _build(coordinator: TrueNASCoordinator) -> dict[str, Callable[[], Entity]]:
-    return {
+    out: dict[str, Callable[[], Entity]] = {
         f"app_{name}": (lambda n=name: TrueNASAppSwitch(coordinator, n))
         for name in coordinator.data.apps
     }
+    for share_id in coordinator.data.smb_shares:
+        out[f"smb_{share_id}"] = lambda i=share_id: TrueNASShareSwitch(coordinator, i)
+    return out
 
 
 async def async_setup_entry(
@@ -107,5 +170,5 @@ async def async_setup_entry(
     entry: TrueNASConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up the app switches."""
+    """Set up the app and share switches."""
     add_dynamic_entities(entry, async_add_entities, _build)

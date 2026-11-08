@@ -155,3 +155,63 @@ pool_export:
       selector:
         config_entry:
           integration: truenas_ws
+
+pool_scrub:
+  fields:
+    name:
+      required: true
+      example: "tank"
+      selector:
+        text:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: truenas_ws
+
+smart_test:
+  fields:
+    type:
+      default: SHORT
+      selector:
+        select:
+          options:
+            - SHORT
+            - LONG
+    disks:
+      example: "sda"
+      selector:
+        text:
+          multiple: true
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: truenas_ws
+
+config_backup:
+  fields:
+    include_secrets:
+      default: false
+      selector:
+        boolean:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: truenas_ws
+
+alert_dismiss:
+  fields:
+    id:
+      required: true
+      selector:
+        text:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: truenas_ws
+
+wake:
+  fields:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: truenas_ws

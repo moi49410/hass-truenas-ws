@@ -13,8 +13,21 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DEV_APPS, DEV_SERVICES, DEV_SYSTEM, GIB
-from .coordinator import TrueNASConfigEntry, TrueNASCoordinator, TrueNASData, prop
+from .const import (
+    ALERT_PROBLEM_LEVELS,
+    DEV_APPS,
+    DEV_DISKS,
+    DEV_SERVICES,
+    DEV_SYSTEM,
+    GIB,
+)
+from .coordinator import (
+    TrueNASConfigEntry,
+    TrueNASCoordinator,
+    TrueNASData,
+    alert_text,
+    prop,
+)
 from .entity import TrueNASEntity, add_dynamic_entities, app_icon, clean_attrs
 from .sensor import _pool_attrs, _pool_value
 
@@ -148,6 +161,65 @@ def _build(coordinator: TrueNASCoordinator) -> dict[str, Callable[[], Entity]]:
             BinarySensorDeviceClass.RUNNING,
             lambda d, n=app_name: app_icon(d.apps.get(n)),
         )
+
+    # Disk health: on = problem (ZFS errors, degraded vdev member, or an
+    # active TrueNAS alert naming the disk, e.g. SMART or temperature).
+    def _disk_alerts(d: TrueNASData, disk: dict[str, Any]) -> list[str]:
+        needles = [n for n in (disk.get("name"), disk.get("serial")) if n]
+        return [
+            alert_text(a)
+            for a in d.alerts
+            if not a.get("dismissed") and any(n in alert_text(a) for n in needles)
+        ]
+
+    def _disk_problem(d: TrueNASData, key: str) -> bool:
+        disk = d.disks[key]
+        health = d.disk_health.get(disk["name"]) or {}
+        errors = sum(
+            health.get(k) or 0
+            for k in ("read_errors", "write_errors", "checksum_errors")
+        )
+        status = health.get("status")
+        return bool(
+            errors
+            or (status and status not in ("ONLINE", "AVAIL"))
+            or _disk_alerts(d, disk)
+        )
+
+    for disk_key, disk in data.disks.items():
+        add(
+            f"disk_health_{disk_key}",
+            DEV_DISKS,
+            f"{disk['name']} health",
+            f"disk_{disk_key}_health",
+            lambda d, k=disk_key: _disk_problem(d, k),
+            lambda d, k=disk_key: k in d.disks,
+            lambda d, k=disk_key: {
+                **(d.disk_health.get(d.disks[k]["name"]) or {}),
+                "alerts": _disk_alerts(d, d.disks[k]) or None,
+            },
+            BinarySensorDeviceClass.PROBLEM,
+        )
+
+    # Any active TrueNAS alert of level WARNING or above.
+    def _problem_alerts(d: TrueNASData) -> list[str]:
+        return [
+            alert_text(a)
+            for a in d.alerts
+            if not a.get("dismissed")
+            and str(a.get("level") or "").upper() in ALERT_PROBLEM_LEVELS
+        ]
+
+    out["sys_alert"] = lambda: TrueNASBinarySensor(
+        coordinator,
+        DEV_SYSTEM,
+        "Alert",
+        "system_alert",
+        lambda d: bool(_problem_alerts(d)),
+        lambda d: True,
+        lambda d: {"Alerts": _problem_alerts(d) or None},
+        BinarySensorDeviceClass.PROBLEM,
+    )
 
     return out
 

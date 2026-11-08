@@ -21,6 +21,7 @@ from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
+    DEV_APPS,
     DEV_CLOUDSYNC,
     DEV_DATASETS,
     DEV_DISKS,
@@ -33,7 +34,9 @@ from .coordinator import (
     TrueNASConfigEntry,
     TrueNASCoordinator,
     TrueNASData,
+    alert_text,
     parse_date,
+    parse_topology,
     prop,
 )
 from .entity import TrueNASEntity, add_dynamic_entities, clean_attrs
@@ -168,6 +171,10 @@ def _pool_attrs(pool: dict[str, Any]) -> dict[str, Any]:
         "Usage": round(allocated / size * 100, 1)
         if isinstance(size, int | float) and size and isinstance(allocated, int | float)
         else None,
+        "Topology": {
+            role: ", ".join(vdevs) for role, vdevs in parse_topology(pool)[0].items()
+        }
+        or None,
     }
 
 
@@ -352,7 +359,10 @@ def _build(coordinator: TrueNASCoordinator) -> dict[str, Callable[[], Entity]]:
         )
 
     # Disks ---------------------------------------------------------- #
-    def _disk_attrs(disk: dict[str, Any]) -> dict[str, Any]:
+    def _disk_attrs(d: TrueNASData, key: str) -> dict[str, Any]:
+        disk = d.disks[key]
+        health = d.disk_health.get(disk["name"]) or {}
+        filt = d.temp_filter.get(disk["name"]) or {}
         return {
             "Serial": disk.get("serial"),
             "Size": _gib(disk.get("size")),
@@ -366,7 +376,15 @@ def _build(coordinator: TrueNASCoordinator) -> dict[str, Callable[[], Entity]]:
             "Devname": disk.get("devname"),
             "Zfs guid": disk.get("zfs_guid"),
             "Identifier": disk.get("identifier"),
-            "Pool": disk.get("pool"),
+            "Pool": disk.get("pool") or health.get("pool"),
+            "Role": health.get("role"),
+            "Vdev": health.get("vdev"),
+            "ZFS status": health.get("status"),
+            "Read errors": health.get("read_errors"),
+            "Write errors": health.get("write_errors"),
+            "Checksum errors": health.get("checksum_errors"),
+            "Raw temperature": filt.get("raw"),
+            "Spurious readings ignored": filt.get("ignored") or None,
         }
 
     for disk_key, disk in data.disks.items():
@@ -377,7 +395,7 @@ def _build(coordinator: TrueNASCoordinator) -> dict[str, Callable[[], Entity]]:
             f"disk_{disk_key}",
             lambda d, k=disk_key: d.disk_temps.get(d.disks[k]["name"]),
             exists_fn=lambda d, k=disk_key: k in d.disks,
-            attrs_fn=lambda d, k=disk_key: _disk_attrs(d.disks[k]),
+            attrs_fn=lambda d, k=disk_key: _disk_attrs(d, k),
             **temp_kw,
         )
 
@@ -457,6 +475,122 @@ def _build(coordinator: TrueNASCoordinator) -> dict[str, Callable[[], Entity]]:
                     else None
                 ),
             },
+        )
+
+    # Alerts --------------------------------------------------------- #
+    def _active_alerts(d: TrueNASData) -> list[dict[str, Any]]:
+        return [a for a in d.alerts if not a.get("dismissed")]
+
+    add(
+        "sys_alerts",
+        DEV_SYSTEM,
+        "Alerts",
+        "system_alerts",
+        lambda d: len(_active_alerts(d)),
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:bell-alert-outline",
+        attrs_fn=lambda d: {
+            "Alerts": [
+                {
+                    "uuid": a.get("uuid") or a.get("id"),
+                    "level": a.get("level"),
+                    "text": alert_text(a),
+                    "datetime": str(parse_date(a.get("datetime")) or ""),
+                }
+                for a in _active_alerts(d)
+            ],
+            "Dismissed": sum(1 for a in d.alerts if a.get("dismissed")),
+        },
+    )
+
+    # Scrub per pool ------------------------------------------------- #
+    for pool_name in data.pools:
+        add(
+            f"pool_scrub_{pool_name}",
+            DEV_SYSTEM,
+            f"{pool_name} scrub",
+            f"pool_{pool_name}_scrub",
+            lambda d, n=pool_name: (d.pools[n].get("scan") or {}).get("state"),
+            exists_fn=lambda d, n=pool_name: n in d.pools,
+            icon="mdi:magnify-scan",
+            attrs_fn=lambda d, n=pool_name: {
+                "Function": (d.pools[n].get("scan") or {}).get("function"),
+                "Percentage": (d.pools[n].get("scan") or {}).get("percentage"),
+                "Errors": (d.pools[n].get("scan") or {}).get("errors"),
+                "Start": parse_date((d.pools[n].get("scan") or {}).get("start_time")),
+                "End": parse_date((d.pools[n].get("scan") or {}).get("end_time")),
+                "Secs left": (d.pools[n].get("scan") or {}).get("total_secs_left"),
+            },
+        )
+
+    # Task progress -------------------------------------------------- #
+    def _progress(job: Any) -> float:
+        job = job or {}
+        if job.get("state") not in ("RUNNING", "WAITING"):
+            return 0
+        return round(float((job.get("progress") or {}).get("percent") or 0), 1)
+
+    pct_kw = {
+        "native_unit_of_measurement": PERCENTAGE,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "icon": "mdi:progress-upload",
+    }
+    for rep_id, rep in data.replications.items():
+        add(
+            f"rep_progress_{rep_id}",
+            DEV_REPLICATION,
+            f"{rep.get('name') or f'task {rep_id}'} progress",
+            f"replication_{rep_id}_progress",
+            lambda d, i=rep_id: _progress(d.replications[i].get("job")),
+            exists_fn=lambda d, i=rep_id: i in d.replications,
+            attrs_fn=lambda d, i=rep_id: {
+                "Description": (
+                    (d.replications[i].get("job") or {}).get("progress") or {}
+                ).get("description")
+            },
+            **pct_kw,
+        )
+    for cs_id, cs in data.cloudsyncs.items():
+        add(
+            f"cs_progress_{cs_id}",
+            DEV_CLOUDSYNC,
+            f"{cs.get('description') or f'task {cs_id}'} progress",
+            f"cloudsync_{cs_id}_progress",
+            lambda d, i=cs_id: _progress(d.cloudsyncs[i].get("job")),
+            exists_fn=lambda d, i=cs_id: i in d.cloudsyncs,
+            attrs_fn=lambda d, i=cs_id: {
+                "Description": (
+                    (d.cloudsyncs[i].get("job") or {}).get("progress") or {}
+                ).get("description")
+            },
+            **pct_kw,
+        )
+
+    # Per-app resource usage ----------------------------------------- #
+    for app_name in data.apps:
+        add(
+            f"app_cpu_{app_name}",
+            DEV_APPS,
+            f"{app_name} CPU",
+            f"app_{app_name}_cpu",
+            lambda d, n=app_name: (d.app_stats.get(n) or {}).get("cpu_usage"),
+            exists_fn=lambda d, n=app_name: n in d.apps,
+            native_unit_of_measurement=PERCENTAGE,
+            state_class=SensorStateClass.MEASUREMENT,
+            icon="mdi:cpu-64-bit",
+        )
+        add(
+            f"app_mem_{app_name}",
+            DEV_APPS,
+            f"{app_name} memory",
+            f"app_{app_name}_memory",
+            lambda d, n=app_name: (d.app_stats.get(n) or {}).get("memory"),
+            exists_fn=lambda d, n=app_name: n in d.apps,
+            device_class=SensorDeviceClass.DATA_SIZE,
+            native_unit_of_measurement=UnitOfInformation.BYTES,
+            suggested_unit_of_measurement=UnitOfInformation.MEBIBYTES,
+            state_class=SensorStateClass.MEASUREMENT,
+            suggested_display_precision=0,
         )
 
     return out

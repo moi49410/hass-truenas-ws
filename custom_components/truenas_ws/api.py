@@ -94,6 +94,24 @@ class TrueNASClient:
         return f"wss://{self._host}/api/current"
 
     @property
+    def base_url(self) -> str:
+        """Return the HTTPS base URL (for downloads)."""
+        return f"https://{self._host}"
+
+    @property
+    def verify_ssl(self) -> bool:
+        """Whether the certificate is verified."""
+        return self._verify_ssl
+
+    @property
+    def host(self) -> str:
+        """Host name or address, without port."""
+        host = self._host
+        if host.startswith("["):  # IPv6 literal
+            return host[1 : host.find("]")]
+        return host.rsplit(":", 1)[0] if host.count(":") == 1 else host
+
+    @property
     def connected(self) -> bool:
         """Return True when the socket is open and the reader is alive."""
         return (
@@ -300,6 +318,12 @@ class TrueNASClient:
         job_id = await self.call(method, params)
         if not wait or not isinstance(job_id, int):
             return job_id
+        return await self.wait_job(job_id, method, timeout)
+
+    async def wait_job(
+        self, job_id: int, method: str = "job", timeout: float = 3600
+    ) -> Any:
+        """Wait for a job to end and return its result."""
         async with asyncio.timeout(timeout):
             while True:
                 jobs = await self.call("core.get_jobs", [[["id", "=", job_id]]])

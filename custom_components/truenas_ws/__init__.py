@@ -7,7 +7,7 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigEntryState
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import CONF_API_KEY, CONF_HOST, Platform
 from homeassistant.core import (
     HomeAssistant,
@@ -38,6 +38,10 @@ from .const import (
     ATTR_NAME,
     ATTR_RECURSIVE,
     ATTR_SNAPSHOT_NAME,
+    ATTR_DISKS,
+    ATTR_ID,
+    ATTR_INCLUDE_SECRETS,
+    ATTR_TYPE,
     ATTR_WAIT,
     CONF_VERIFY_SSL,
     DEFAULT_VERIFY_SSL,
@@ -50,7 +54,12 @@ from .const import (
     SERVICE_APP_STOP,
     SERVICE_CLOUDSYNC_RUN,
     SERVICE_POOL_EXPORT,
+    SERVICE_ALERT_DISMISS,
+    SERVICE_CONFIG_BACKUP,
     SERVICE_POOL_IMPORT,
+    SERVICE_POOL_SCRUB,
+    SERVICE_SMART_TEST,
+    SERVICE_WAKE,
     SERVICE_REPLICATION_RUN,
     SERVICE_SERVICE_RESTART,
     SERVICE_SERVICE_START,
@@ -59,6 +68,7 @@ from .const import (
     SERVICE_SYSTEM_REBOOT,
     SERVICE_SYSTEM_SHUTDOWN,
 )
+from . import actions
 from .coordinator import TrueNASConfigEntry, TrueNASCoordinator
 
 PLATFORMS: list[Platform] = [
@@ -74,6 +84,17 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 _ENTRY = vol.Optional(ATTR_CONFIG_ENTRY_ID)
 NAME_SCHEMA = vol.Schema({vol.Required(ATTR_NAME): cv.string, _ENTRY: cv.string})
 ENTRY_SCHEMA = vol.Schema({_ENTRY: cv.string})
+SMART_SCHEMA = vol.Schema(
+    {
+        vol.Optional(ATTR_TYPE, default="SHORT"): vol.In(["SHORT", "LONG"]),
+        vol.Optional(ATTR_DISKS): vol.All(cv.ensure_list, [cv.string]),
+        _ENTRY: cv.string,
+    }
+)
+BACKUP_SCHEMA = vol.Schema(
+    {vol.Optional(ATTR_INCLUDE_SECRETS, default=False): cv.boolean, _ENTRY: cv.string}
+)
+ALERT_SCHEMA = vol.Schema({vol.Required(ATTR_ID): cv.string, _ENTRY: cv.string})
 REPLICATION_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_NAME): cv.string,
@@ -154,6 +175,19 @@ def _coordinator(hass: HomeAssistant, call: ServiceCall) -> TrueNASCoordinator:
             "Several TrueNAS systems are configured: set config_entry_id"
         )
     return entries[0].runtime_data
+
+
+def _entry_any_state(hass: HomeAssistant, call: ServiceCall) -> ConfigEntry:
+    """Config entry even while the NAS is off and the entry is retrying setup."""
+    entries = hass.config_entries.async_entries(DOMAIN)
+    wanted = call.data.get(ATTR_CONFIG_ENTRY_ID)
+    if wanted:
+        entries = [e for e in entries if e.entry_id == wanted]
+    if len(entries) != 1:
+        raise ServiceValidationError(
+            "Set config_entry_id to the TrueNAS system to wake up"
+        )
+    return entries[0]
 
 
 def _find_id(items: dict[str, dict[str, Any]], name: str, *keys: str) -> int:
@@ -350,6 +384,53 @@ def _register_services(hass: HomeAssistant) -> None:
         supports_response=SupportsResponse.OPTIONAL,
     )
     hass.services.async_register(DOMAIN, SERVICE_POOL_EXPORT, pool_export, NAME_SCHEMA)
+
+    async def pool_scrub(call: ServiceCall) -> None:
+        await actions.start_scrub(_coordinator(hass, call), call.data[ATTR_NAME])
+
+    async def smart_test(call: ServiceCall) -> ServiceResponse:
+        disks = await actions.start_smart_test(
+            _coordinator(hass, call), call.data[ATTR_TYPE], call.data.get(ATTR_DISKS)
+        )
+        return {"disks": disks}
+
+    async def config_backup(call: ServiceCall) -> ServiceResponse:
+        return await actions.config_backup(
+            hass, _coordinator(hass, call), call.data[ATTR_INCLUDE_SECRETS]
+        )
+
+    async def alert_dismiss(call: ServiceCall) -> None:
+        coordinator = _coordinator(hass, call)
+        await _run(coordinator, "alert.dismiss", [call.data[ATTR_ID]])
+
+    async def wake(call: ServiceCall) -> ServiceResponse:
+        return {"mac": await actions.wake(hass, _entry_any_state(hass, call))}
+
+    hass.services.async_register(DOMAIN, SERVICE_POOL_SCRUB, pool_scrub, NAME_SCHEMA)
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SMART_TEST,
+        smart_test,
+        SMART_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_CONFIG_BACKUP,
+        config_backup,
+        BACKUP_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+    hass.services.async_register(
+        DOMAIN, SERVICE_ALERT_DISMISS, alert_dismiss, ALERT_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_WAKE,
+        wake,
+        ENTRY_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
     hass.services.async_register(
         DOMAIN, SERVICE_SNAPSHOT_CREATE, snapshot_create, SNAPSHOT_SCHEMA
     )
