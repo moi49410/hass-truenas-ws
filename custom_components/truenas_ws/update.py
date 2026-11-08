@@ -19,7 +19,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .api import TrueNASError, TrueNASMethodNotFound
 from .const import DEV_APPS, DEV_SYSTEM
 from .coordinator import TrueNASConfigEntry, TrueNASCoordinator
-from .entity import TrueNASEntity, add_dynamic_entities
+from .entity import TrueNASEntity, add_dynamic_entities, app_icon
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -101,6 +101,11 @@ class TrueNASAppUpdate(TrueNASEntity, UpdateEntity):
     def available(self) -> bool:
         """Unavailable when the app is removed."""
         return super().available and self._app in self.data.apps
+
+    @property
+    def entity_picture(self) -> str | None:
+        """App icon from the TrueNAS catalog, else the integration icon."""
+        return app_icon(self.data.apps.get(self._app)) or super().entity_picture
 
     @property
     def installed_version(self) -> str | None:

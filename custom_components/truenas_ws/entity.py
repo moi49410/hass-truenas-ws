@@ -86,6 +86,17 @@ def add_dynamic_entities(
     entry.async_on_unload(coordinator.async_add_listener(_add_new))
 
 
+def app_icon(app: dict[str, Any] | None) -> str | None:
+    """Icon URL of a TrueNAS app, as published in its catalog metadata."""
+    if not app:
+        return None
+    meta = app.get("metadata") or {}
+    for url in (meta.get("icon"), meta.get("icon_url"), app.get("icon_url")):
+        if isinstance(url, str) and url.startswith(("https://", "http://")):
+            return url
+    return None
+
+
 def clean_attrs(attrs: dict[str, Any]) -> dict[str, Any]:
     """Drop None values from state attributes."""
     return {k: v for k, v in attrs.items() if v is not None}

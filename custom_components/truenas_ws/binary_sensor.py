@@ -15,7 +15,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DEV_APPS, DEV_SERVICES, DEV_SYSTEM, GIB
 from .coordinator import TrueNASConfigEntry, TrueNASCoordinator, TrueNASData, prop
-from .entity import TrueNASEntity, add_dynamic_entities, clean_attrs
+from .entity import TrueNASEntity, add_dynamic_entities, app_icon, clean_attrs
 from .sensor import _pool_attrs, _pool_value
 
 PARALLEL_UPDATES = 0
@@ -34,6 +34,7 @@ class TrueNASBinarySensor(TrueNASEntity, BinarySensorEntity):
         exists_fn: Callable[[TrueNASData], bool],
         attrs_fn: Callable[[TrueNASData], dict[str, Any]],
         device_class: BinarySensorDeviceClass | None = None,
+        picture_fn: Callable[[TrueNASData], str | None] | None = None,
     ) -> None:
         """Create the binary sensor."""
         super().__init__(coordinator, "binary_sensor", category, item, unique_suffix)
@@ -41,6 +42,14 @@ class TrueNASBinarySensor(TrueNASEntity, BinarySensorEntity):
         self._exists_fn = exists_fn
         self._attrs_fn = attrs_fn
         self._attr_device_class = device_class
+        self._picture_fn = picture_fn
+
+    @property
+    def entity_picture(self) -> str | None:
+        """App icon from the TrueNAS catalog, when there is one."""
+        if self._picture_fn is None:
+            return None
+        return self._picture_fn(self.data)
 
     @property
     def available(self) -> bool:
@@ -137,6 +146,7 @@ def _build(coordinator: TrueNASCoordinator) -> dict[str, Callable[[], Entity]]:
             lambda d, n=app_name: n in d.apps,
             lambda d, n=app_name: _app_attrs(d.apps[n]),
             BinarySensorDeviceClass.RUNNING,
+            lambda d, n=app_name: app_icon(d.apps.get(n)),
         )
 
     return out

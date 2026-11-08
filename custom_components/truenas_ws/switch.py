@@ -16,7 +16,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .api import TrueNASError
 from .const import DEV_APPS
 from .coordinator import TrueNASConfigEntry, TrueNASCoordinator
-from .entity import TrueNASEntity, add_dynamic_entities
+from .entity import TrueNASEntity, add_dynamic_entities, app_icon
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -46,6 +46,11 @@ class TrueNASAppSwitch(TrueNASEntity, SwitchEntity):
     def available(self) -> bool:
         """Unavailable when the app is removed."""
         return super().available and self._app in self.data.apps
+
+    @property
+    def entity_picture(self) -> str | None:
+        """App icon from the TrueNAS catalog, when there is one."""
+        return app_icon(self.data.apps.get(self._app))
 
     @property
     def is_on(self) -> bool | None:
