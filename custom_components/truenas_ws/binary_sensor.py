@@ -10,10 +10,12 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
+    DOMAIN,
     ALERT_PROBLEM_LEVELS,
     DEV_APPS,
     DEV_DISKS,
@@ -84,6 +86,56 @@ class TrueNASBinarySensor(TrueNASEntity, BinarySensorEntity):
             return clean_attrs(self._attrs_fn(self.data))
         except (KeyError, TypeError, ValueError):
             return None
+
+
+def _wanted_health_id(coordinator: TrueNASCoordinator, disk_key: str) -> str | None:
+    """binary_sensor.<temperature sensor object id>_health for this disk."""
+    registry = er.async_get(coordinator.hass)
+    entry = coordinator.config_entry
+    prefix = entry.unique_id or entry.entry_id
+    temp_id = registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{prefix}_disk_{disk_key}"
+    )
+    if temp_id is None:
+        return None
+    return f"binary_sensor.{temp_id.split('.', 1)[1]}_health"
+
+
+def _align_with_temperature_sensor(
+    coordinator: TrueNASCoordinator, disk_key: str, entity: TrueNASBinarySensor
+) -> None:
+    """New health sensors get the same name as the disk's temperature sensor."""
+    wanted = _wanted_health_id(coordinator, disk_key)
+    if wanted:
+        entity.entity_id = wanted
+
+
+def _realign_existing(coordinator: TrueNASCoordinator) -> None:
+    """Rename existing health sensors that point at another disk's letter.
+
+    Device letters (sda, sdb...) can change after a reboot, while entity ids
+    keep the letter of the day they were created. Renamed in two passes so
+    that swapped letters (sda <-> sdd) do not collide.
+    """
+    registry = er.async_get(coordinator.hass)
+    entry = coordinator.config_entry
+    prefix = entry.unique_id or entry.entry_id
+    moves: list[tuple[str, str]] = []
+    for disk_key in coordinator.data.disks:
+        current = registry.async_get_entity_id(
+            "binary_sensor", DOMAIN, f"{prefix}_disk_{disk_key}_health"
+        )
+        wanted = _wanted_health_id(coordinator, disk_key)
+        if current and wanted and current != wanted:
+            moves.append((current, wanted))
+    temp: list[tuple[str, str]] = []
+    for index, (current, wanted) in enumerate(moves):
+        tmp = f"binary_sensor.truenas_ws_realign_{index}"
+        registry.async_update_entity(current, new_entity_id=tmp)
+        temp.append((tmp, wanted))
+    for tmp, wanted in temp:
+        if registry.async_get(wanted) is None:
+            registry.async_update_entity(tmp, new_entity_id=wanted)
 
 
 def _build(coordinator: TrueNASCoordinator) -> dict[str, Callable[[], Entity]]:
@@ -186,9 +238,10 @@ def _build(coordinator: TrueNASCoordinator) -> dict[str, Callable[[], Entity]]:
             or _disk_alerts(d, disk)
         )
 
-    for disk_key, disk in data.disks.items():
-        add(
-            f"disk_health_{disk_key}",
+    def _health_sensor(disk_key: str) -> TrueNASBinarySensor:
+        disk = coordinator.data.disks[disk_key]
+        entity = TrueNASBinarySensor(
+            coordinator,
             DEV_DISKS,
             f"{disk['name']} health",
             f"disk_{disk_key}_health",
@@ -200,6 +253,11 @@ def _build(coordinator: TrueNASCoordinator) -> dict[str, Callable[[], Entity]]:
             },
             BinarySensorDeviceClass.PROBLEM,
         )
+        _align_with_temperature_sensor(coordinator, disk_key, entity)
+        return entity
+
+    for disk_key in data.disks:
+        out[f"disk_health_{disk_key}"] = lambda k=disk_key: _health_sensor(k)
 
     # Any active TrueNAS alert of level WARNING or above.
     def _problem_alerts(d: TrueNASData) -> list[str]:
@@ -230,4 +288,5 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the binary sensors."""
+    _realign_existing(entry.runtime_data)
     add_dynamic_entities(entry, async_add_entities, _build)
