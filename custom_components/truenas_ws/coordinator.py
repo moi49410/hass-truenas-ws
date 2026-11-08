@@ -528,6 +528,11 @@ def parse_topology(
                 health[name] = {
                     "role": role,
                     "vdev": desc,
+                    "vdev_guid": str(leaf.get("guid")) if leaf.get("guid") else None,
+                    "device": leaf.get("disk") or leaf.get("device"),
+                    "matched_by": "guid"
+                    if guid_names.get(str(leaf.get("guid")))
+                    else "device name",
                     "status": leaf.get("status"),
                     "read_errors": int(stats.get("read_errors") or 0),
                     "write_errors": int(stats.get("write_errors") or 0),
