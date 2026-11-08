@@ -270,9 +270,19 @@ class TrueNASCoordinator(DataUpdateCoordinator[TrueNASData]):
         data.temp_filter = self._temp_filter
 
         # Pool topology and per-disk ZFS health --------------------------- #
+        # Join on the ZFS guid: device letters (sda, sdb...) can differ
+        # between disk.query and the live pool topology after a reboot.
+        guid_names = {
+            str(d["zfs_guid"]): d["name"]
+            for d in data.disks.values()
+            if d.get("zfs_guid")
+        }
         for pool_name, pool in data.pools.items():
-            roles, health = parse_topology(pool)
+            roles, health = parse_topology(pool, guid_names)
             data.topology[pool_name] = roles
+            pool["_topology_summary"] = {
+                role: ", ".join(vdevs) for role, vdevs in roles.items()
+            }
             for disk_name, info in health.items():
                 data.disk_health[disk_name] = {"pool": pool_name, **info}
 
@@ -487,9 +497,14 @@ def _vdev_leaves(vdev: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def parse_topology(
-    pool: dict[str, Any],
+    pool: dict[str, Any], guid_names: dict[str, str] | None = None
 ) -> tuple[dict[str, list[str]], dict[str, dict[str, Any]]]:
-    """Return ({role: [vdev descriptions]}, {disk: health}) for one pool."""
+    """Return ({role: [vdev descriptions]}, {disk: health}) for one pool.
+
+    ``guid_names`` maps ZFS vdev guids to disk names (from disk.query) and
+    takes precedence over the device name reported in the topology.
+    """
+    guid_names = guid_names or {}
     topology = pool.get("topology") or {}
     roles: dict[str, list[str]] = {}
     health: dict[str, dict[str, Any]] = {}
@@ -497,7 +512,8 @@ def parse_topology(
         for vdev in topology.get(role) or []:
             leaves = _vdev_leaves(vdev)
             names = [
-                disk_base_name(
+                guid_names.get(str(leaf.get("guid")))
+                or disk_base_name(
                     leaf.get("disk") or leaf.get("device") or leaf.get("path")
                 )
                 for leaf in leaves

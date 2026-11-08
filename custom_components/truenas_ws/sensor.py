@@ -36,7 +36,6 @@ from .coordinator import (
     TrueNASData,
     alert_text,
     parse_date,
-    parse_topology,
     prop,
 )
 from .entity import TrueNASEntity, add_dynamic_entities, clean_attrs
@@ -171,10 +170,7 @@ def _pool_attrs(pool: dict[str, Any]) -> dict[str, Any]:
         "Usage": round(allocated / size * 100, 1)
         if isinstance(size, int | float) and size and isinstance(allocated, int | float)
         else None,
-        "Topology": {
-            role: ", ".join(vdevs) for role, vdevs in parse_topology(pool)[0].items()
-        }
-        or None,
+        "Topology": pool.get("_topology_summary") or None,
     }
 
 
